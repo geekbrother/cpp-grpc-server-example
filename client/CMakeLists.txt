@@ -27,7 +27,7 @@ else()
   set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 endif()
 
-get_filename_component(sample_proto "./protos/sample.proto" ABSOLUTE)
+get_filename_component(sample_proto "../protos/sample.proto" ABSOLUTE)
 get_filename_component(sample_proto_path "${sample_proto}" PATH)
 
 set(sample_proto_sources "${CMAKE_CURRENT_BINARY_DIR}/sample.pb.cc")
@@ -55,8 +55,8 @@ target_link_libraries(sample_grpc_proto
   ${_REFLECTION}
   ${_GRPC_GRPCPP})
 
-add_executable(basic_grpc "src/server.cpp")
-target_link_libraries(basic_grpc
+add_executable(grpc_client "src/client.cpp")
+target_link_libraries(grpc_client
   sample_grpc_proto
   ${_PROTOBUF_LIBPROTOBUF}
   ${_REFLECTION}

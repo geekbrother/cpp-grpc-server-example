@@ -13,5 +13,8 @@ message SampleRequest {
 }
 
 message SampleResponse {
-    string response_sample_field = 1;
+    oneof oneof_sample{
+        string response_sample_field = 1;
+        bool ping = 2;
+    }
 }
