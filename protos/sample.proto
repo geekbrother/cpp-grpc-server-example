@@ -4,6 +4,8 @@ option java_package = "sample.grpc";
 
 package sample;
 
+import "google/protobuf/empty.proto";
+
 service SampleService {
     rpc SampleStreamMethod (SampleRequest) returns (stream SampleResponse) {}
 }
@@ -12,9 +14,13 @@ message SampleRequest {
     string request_sample_field = 1;
 }
 
+message SampleField {
+    string response_sample_field = 1;
+}
+
 message SampleResponse {
     oneof oneof_sample{
-        string response_sample_field = 1;
-        bool ping = 2;
+        SampleField sample_field = 1;
+        google.protobuf.Empty ping = 2;
     }
 }

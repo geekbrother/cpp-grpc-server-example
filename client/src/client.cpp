@@ -27,15 +27,15 @@ public:
     std::unique_ptr<::grpc::ClientReader<::sample::SampleResponse>> reader(_stub->SampleStreamMethod(&context, request));
     while (reader->Read(&response))
     {
-      if (!response.response_sample_field().empty())
+      if (!response.sample_field().response_sample_field().empty())
       {
         std::cout << "Found response_sample_field "
-                  << response.response_sample_field() << std::endl;
+                  << response.sample_field().response_sample_field() << std::endl;
       }
-      if (response.ping())
+      if (response.has_ping())
       {
         std::cout << "Found ping "
-                  << response.ping() << std::endl;
+                  << response.has_ping() << std::endl;
       }
     }
   }

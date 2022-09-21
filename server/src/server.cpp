@@ -1,4 +1,5 @@
 #include "sample.grpc.pb.h"
+#include "sample.pb.h"
 #include <grpc++/grpc++.h>
 #include <memory>
 #include <iostream>
@@ -40,7 +41,7 @@ private:
           [&]()
       {
         SampleResponse response;
-        response.set_ping(true);
+        response.mutable_ping();
         while (true)
         {
           if (!this->respondToWriter(context, writer, response))
@@ -50,7 +51,7 @@ private:
             return;
           }
           std::cout << "Ping sent" << std::endl;
-          std::this_thread::sleep_for(std::chrono::seconds(3));
+          std::this_thread::sleep_for(std::chrono::seconds(1));
         };
       };
       // Pinging thread
@@ -61,8 +62,7 @@ private:
       {
         i++;
         SampleResponse response;
-        response.set_response_sample_field("Hello " + request->request_sample_field());
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        response.mutable_sample_field()->set_response_sample_field("Hello " + request->request_sample_field());
         if (!this->respondToWriter(context, writer, response))
         {
           std::cerr << "gRPC: 'Get' writer error on sending data to the client in `respondToWriter`" << std::endl;
@@ -74,7 +74,7 @@ private:
           return grpc::Status(grpc::StatusCode::INTERNAL, "got error from Writer");
         }
         std::cout << "Response " << i << " to stream" << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(10));
       }
       ping_thread.join();
     }
