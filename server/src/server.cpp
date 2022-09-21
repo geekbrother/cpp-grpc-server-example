@@ -6,6 +6,7 @@
 #include <chrono>
 #include <thread>
 #include <mutex>
+#include <atomic>
 
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -18,71 +19,74 @@ using sample::SampleService;
 class SampleServiceImpl final : public SampleService::Service
 {
 private:
-  std::mutex writerMutex;
-  bool respondToWriter(ServerContext *context, grpc::ServerWriter<SampleResponse> *writer, SampleResponse response)
-  {
-    std::lock_guard<std::mutex> lock(this->writerMutex);
-    if (context->IsCancelled())
-    {
-      std::cerr << "Context was cancelled on write" << std::endl;
-      return false;
-    }
-    if (!writer->Write(response))
-    {
-      return false;
-    }
-    return true;
-  }
   Status SampleStreamMethod(ServerContext *context, const SampleRequest *request, grpc::ServerWriter<SampleResponse> *writer) override
   {
+    std::mutex writerMutex;
+    std::atomic_bool writerIsReady = true;
+
+    auto respondToWriter = [&](SampleResponse response)
+    {
+      std::lock_guard<std::mutex> lock(writerMutex);
+      if (!writer->Write(response))
+      {
+        writerIsReady = false;
+        return false;
+      }
+      return true;
+    };
+
+    // Pinging thread
+    auto sendPings = [&]()
+    {
+      SampleResponse response;
+      response.mutable_ping();
+      while (true)
+      {
+        if (!writerIsReady)
+        {
+          return;
+        }
+        if (!respondToWriter(response))
+        {
+          std::cerr << "gRPC: 'Get' writer error on sending data to the client in `sendpings`" << std::endl;
+          return;
+        }
+        std::cout << "Ping sent" << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+      }
+    };
+    std::thread ping_thread(sendPings);
+
     try
     {
-      auto sendPings =
-          [&]()
-      {
-        SampleResponse response;
-        response.mutable_ping();
-        while (true)
-        {
-          if (!this->respondToWriter(context, writer, response))
-          {
-            std::cerr << "gRPC: 'Get' writer error on sending data to the client in `respondToWriter`" << std::endl;
-            context->TryCancel();
-            return;
-          }
-          std::cout << "Ping sent" << std::endl;
-          std::this_thread::sleep_for(std::chrono::seconds(1));
-        };
-      };
-      // Pinging thread
-      std::thread ping_thread(sendPings);
-
       int i;
       while (true)
       {
         i++;
         SampleResponse response;
         response.mutable_sample_field()->set_response_sample_field("Hello " + request->request_sample_field());
-        if (!this->respondToWriter(context, writer, response))
+        if (!writerIsReady)
         {
-          std::cerr << "gRPC: 'Get' writer error on sending data to the client in `respondToWriter`" << std::endl;
-
-          std::cerr << "Try cancel" << std::endl;
-          context->TryCancel();
-
-          std::cerr << "Try return" << std::endl;
+          ping_thread.join();
+          std::cerr << "gRPC: Writer is not ready to send response" << std::endl;
+          return grpc::Status(grpc::StatusCode::INTERNAL, "got error from Writer");
+        }
+        if (!respondToWriter(response))
+        {
+          ping_thread.join();
+          std::cerr << "gRPC: 'Get' writer error on sending data to the client in `responses`" << std::endl;
           return grpc::Status(grpc::StatusCode::INTERNAL, "got error from Writer");
         }
         std::cout << "Response " << i << " to stream" << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(10));
       }
-      ping_thread.join();
     }
     catch (...)
     {
-      std::cerr << "Got error from stream" << std::endl;
+      ping_thread.join();
+      std::cerr << "Got error from grpc." << std::endl;
+      return grpc::Status(grpc::StatusCode::INTERNAL, "got error from Writer");
     }
-    return grpc::Status(grpc::StatusCode::INTERNAL, "got error from Writer");
   }
 };
 
